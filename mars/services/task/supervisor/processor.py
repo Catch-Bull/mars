@@ -250,6 +250,7 @@ class TaskProcessor:
         decref_chunk_keys = []
         for args, kwargs in zip(args_list, kwargs_list):
             decref_chunk_keys.extend(self._get_decref_stage_chunk_keys(*args, **kwargs))
+        await asyncio.sleep(20)
         await self._lifecycle_api.decref_chunks(decref_chunk_keys)
 
     async def _get_next_chunk_graph(
@@ -378,6 +379,7 @@ class TaskProcessor:
     @_record_error
     async def schedule(self, stage_processor: TaskStageProcessor):
         await stage_processor.run()
+        await asyncio.sleep(10)
 
     def gen_result(self):
         self.result.status = TaskStatus.terminated
@@ -777,7 +779,7 @@ class TaskProcessorActor(mo.Actor):
         raise KeyError(f"Tileable {tileable_key} does not exist")  # pragma: no cover
 
     async def _decref_input_subtasks(
-        self, subtask: Subtask, subtask_graph: SubtaskGraph
+        self, subtask: Subtask, subtask_graph: SubtaskGraph, stage_processor=None
     ):
         # make sure subtasks are decreffed only once
         if subtask.subtask_id not in self._subtask_decref_events:
@@ -801,6 +803,8 @@ class TaskProcessorActor(mo.Actor):
                             # decref main key as well
                             decref_chunk_keys.extend([key[0] for key in data_keys])
                 decref_chunk_keys.append(result_chunk.key)
+        if stage_processor.result.status == TaskStatus.terminated:
+            await asyncio.sleep(10)
         await self._lifecycle_api.decref_chunks(decref_chunk_keys)
         self._subtask_decref_events.pop(subtask.subtask_id).set()
 
@@ -822,7 +826,7 @@ class TaskProcessorActor(mo.Actor):
                 # we need to release actor lock to make `decref_chunks` parallel to avoid blocking
                 # other `set_subtask_result` calls.
                 yield self._decref_input_subtasks(
-                    subtask, stage_processor.subtask_graph
+                    subtask, stage_processor.subtask_graph, stage_processor
                 )
             except:  # noqa: E722  # nosec  # pylint: disable=bare-except  # pragma: no cover
                 _, err, tb = sys.exc_info()

@@ -113,17 +113,19 @@ class TaskStageProcessor:
         self._done.set()
 
     async def set_subtask_result(self, result: SubtaskResult):
+        error_or_cancelled = result.status in (
+            SubtaskStatus.errored,
+            SubtaskStatus.cancelled,
+        )
         subtask = self.subtask_id_to_subtask[result.subtask_id]
+        if error_or_cancelled and self.result.status == TaskStatus.terminated:
+            await asyncio.sleep(10)
         self.subtask_results[subtask] = result.merge_bands(
             self.subtask_results.get(subtask)
         )
         self._submitted_subtask_ids.difference_update([result.subtask_id])
 
         all_done = len(self.subtask_results) == len(self.subtask_graph)
-        error_or_cancelled = result.status in (
-            SubtaskStatus.errored,
-            SubtaskStatus.cancelled,
-        )
 
         if all_done or error_or_cancelled:
             # terminated
