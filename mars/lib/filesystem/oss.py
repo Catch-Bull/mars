@@ -105,6 +105,8 @@ class OSSFileSystem(FileSystem):
 
     @implements(FileSystem.open)
     def open(self, path: path_type, mode: str = "rb") -> OSSIOBase:
+        if mode not in ("rb", "wb", "w"):
+            raise NotImplementedError("OSS file descripe mode only support rb, wb or w")
         file_handle = OSSIOBase(path, mode)
         return file_handle
 

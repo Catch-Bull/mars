@@ -36,6 +36,8 @@ class OSSIOBase(IOBase):
         self._buffer = b""
         self._buffer_size = 1 * 1024
         self._mode = mode
+        self._offset = 0
+        self._colsed = False
 
     @property
     def mode(self):
@@ -149,8 +151,27 @@ class OSSIOBase(IOBase):
         return True
 
     def writable(self):
-        return False
+        return self._mode in ("w", "wb")
+
+    def write(self, value):
+        if not self.writable():
+            raise RuntimeError("The current mode does not support write.")
+        if self._colsed:
+            raise IOError("the current handler already closed.")
+        headers = dict()
+        if self._mode == "w":
+            headers["Content-Encoding"] = "utf-8"
+        if len(value) == 0:
+            return
+
+        if self._offset == 0 and self._bucket.object_exists(self._key_name):
+            self._bucket.delete_object(self._key_name)
+        result = self._bucket.append_object(
+            self._key_name, self._offset, value, headers=headers
+        )
+
+        self._offset = result.next_position
 
     def close(self):
-        # already closed by oss
-        pass
+        self._colsed = True
+        self._offset = -1

@@ -20,7 +20,8 @@ import pandas as pd
 from ... import opcodes as OperandDef
 from ...core import OutputType, recursive_tile
 from ...core.operand import OperandStage
-from ...lib.filesystem import open_file
+from ...lib.filesystem import open_file, get_fs
+from ...lib.filesystem.oss import OSSFileSystem
 from ...serialization.serializables import (
     KeyField,
     AnyField,
@@ -576,6 +577,10 @@ def to_csv(
 
     if mode != "w":  # pragma: no cover
         raise NotImplementedError("only support to_csv with mode 'w' for now")
+    if "*" not in path and isinstance(get_fs(path), OSSFileSystem):
+        raise NotImplementedError(
+            "not support merging all chunks into one CSV file yet."
+        )
     op = DataFrameToCSV(
         path=path,
         sep=sep,
